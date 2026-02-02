@@ -9,13 +9,23 @@
   "categories": [
     "Other"
   ],
-  "activationEvents": [],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
       {
-        "command": "sync-on.helloWorld",
-        "title": "Hello World"
+        "command": "sync-on.login",
+        "title": "Sync On: Login with GitHub"
+      },
+      {
+        "command": "sync-on.upload",
+        "title": "Sync On: Upload Settings"
+      },
+      {
+        "command": "sync-on.download",
+        "title": "Sync On: Download Settings"
       }
     ]
   },

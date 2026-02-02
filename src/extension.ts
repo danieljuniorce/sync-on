@@ -1,26 +1,65 @@
-// The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
-import * as vscode from 'vscode';
+import * as vscode from "vscode";
+import { SyncService } from "./syncService";
+import * as auth from "./auth";
 
-// This method is called when your extension is activated
-// Your extension is activated the very first time the command is executed
+let syncService: SyncService;
+
 export function activate(context: vscode.ExtensionContext) {
+  console.log('Congratulations, your extension "sync-on" is now active!');
 
-	// Use the console to output diagnostic information (console.log) and errors (console.error)
-	// This line of code will only be executed once when your extension is activated
-	console.log('Congratulations, your extension "sync-on" is now active!');
+  syncService = new SyncService();
 
-	// The command has been defined in the package.json file
-	// Now provide the implementation of the command with registerCommand
-	// The commandId parameter must match the command field in package.json
-	const disposable = vscode.commands.registerCommand('sync-on.helloWorld', () => {
-		// The code you place here will be executed every time your command is executed
-		// Display a message box to the user
-		vscode.window.showInformationMessage('Hello World from sync-on!');
-	});
+  // Commands
+  context.subscriptions.push(
+    vscode.commands.registerCommand("sync-on.login", async () => {
+      const token = await auth.getGithubToken();
+      if (token) {
+        vscode.window.showInformationMessage("Sync-On: Logged in to GitHub!");
+      }
+    }),
+    vscode.commands.registerCommand("sync-on.upload", () =>
+      syncService.syncUp(),
+    ),
+    vscode.commands.registerCommand("sync-on.download", () =>
+      syncService.syncDown(),
+    ),
+  );
 
-	context.subscriptions.push(disposable);
+  // Initial Sync (Download)
+  // We delay this slightly to ensure VS Code is fully setup
+  setTimeout(() => {
+    auth.getSession().then((session) => {
+      if (session) {
+        syncService.syncDown();
+      }
+    });
+  }, 5000);
+
+  // Watchers (Upload on change)
+  let throttleTimeout: NodeJS.Timeout | undefined;
+  const triggerUpload = () => {
+    if (throttleTimeout) {
+      clearTimeout(throttleTimeout);
+    }
+    throttleTimeout = setTimeout(() => {
+      syncService.syncUp();
+    }, 30000); // 30 seconds debounce
+  };
+
+  context.subscriptions.push(
+    vscode.workspace.onDidChangeConfiguration((e) => {
+      if (!e.affectsConfiguration("sync-on")) {
+        // Ignore our own config changes
+        triggerUpload();
+      }
+    }),
+    vscode.extensions.onDidChange(triggerUpload),
+  );
 }
 
-// This method is called when your extension is deactivated
-export function deactivate() {}
+export function deactivate() {
+  // Attempt one final sync up on close
+  if (syncService) {
+    return syncService.syncUp();
+  }
+}
