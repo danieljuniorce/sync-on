@@ -25,15 +25,11 @@ export function activate(context: vscode.ExtensionContext) {
     ),
   );
 
-  // Initial Sync (Download)
+  // Initial Sync / Onboarding
   // We delay this slightly to ensure VS Code is fully setup
   setTimeout(() => {
-    auth.getSession().then((session) => {
-      if (session) {
-        syncService.syncDown();
-      }
-    });
-  }, 5000);
+    syncService.initiateStartup();
+  }, 3000);
 
   // Watchers (Upload on change)
   let throttleTimeout: NodeJS.Timeout | undefined;

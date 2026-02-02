@@ -107,4 +107,60 @@ export class SyncService {
       vscode.window.showErrorMessage("Sync-On: Download failed.");
     }
   }
+
+  async initiateStartup() {
+    // 1. Check Login Status
+    let session = await auth.getSession();
+    if (!session) {
+      const selection = await vscode.window.showInformationMessage(
+        "Sync-On needs to connect to GitHub to sync your settings.",
+        "Login with GitHub",
+      );
+      if (selection === "Login with GitHub") {
+        const token = await auth.getGithubToken();
+        if (!token) {
+          return; // User cancelled or failed
+        }
+        // Refresh session after login
+        session = await auth.getSession();
+      } else {
+        return; // User declined login
+      }
+    }
+
+    if (!session) return;
+    const token = session.accessToken;
+
+    // 2. Check for existing Gist
+    try {
+      const existingGist = await gistService.getGist(token);
+
+      if (existingGist) {
+        // 3. Gist Found: Ask to Download or Overwrite
+        const selection = await vscode.window.showInformationMessage(
+          "Sync-On found an existing configuration on GitHub.",
+          "Download (Restore)",
+          "Upload (Overwrite)",
+        );
+
+        if (selection === "Download (Restore)") {
+          await this.syncDown();
+        } else if (selection === "Upload (Overwrite)") {
+          await this.syncUp();
+        }
+      } else {
+        // 4. No Gist: Ask to Create
+        const selection = await vscode.window.showInformationMessage(
+          "No existing Sync-On configuration found. Would you like to upload your current settings?",
+          "Upload & Start Syncing",
+        );
+
+        if (selection === "Upload & Start Syncing") {
+          await this.syncUp();
+        }
+      }
+    } catch (error) {
+      console.error("Error during startup check:", error);
+    }
+  }
 }
