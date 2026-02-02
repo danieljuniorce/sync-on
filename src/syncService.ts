@@ -22,6 +22,7 @@ export class SyncService {
       const keybindings = await localFiles.getFileContent(
         localFiles.KEYBINDINGS_FILE,
       );
+      const mcpConfig = await localFiles.getFileContent(localFiles.MCP_FILE);
       const extensions = localFiles.getInstalledExtensions();
 
       // Gather custom files if configured
@@ -30,6 +31,7 @@ export class SyncService {
       const data: gistService.SyncData = {
         settings: settings || undefined,
         keybindings: keybindings || undefined,
+        mcpConfig: mcpConfig || undefined,
         extensions: extensions.map((e) => `${e.id}@${e.version}`),
         lastUpload: new Date().toISOString(),
       };
@@ -83,6 +85,9 @@ export class SyncService {
           localFiles.KEYBINDINGS_FILE,
           data.keybindings,
         );
+      }
+      if (data.mcpConfig) {
+        await localFiles.writeFileContent(localFiles.MCP_FILE, data.mcpConfig);
       }
       if (data.extensions) {
         const extsToInstall = data.extensions.map((e) => {

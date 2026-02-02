@@ -10,6 +10,7 @@ interface GistFile {
 export interface SyncData {
   settings?: string;
   keybindings?: string;
+  mcpConfig?: string;
   extensions?: string[];
   [key: string]: any;
 }

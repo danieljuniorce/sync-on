@@ -9,34 +9,100 @@ export interface ExtensionInfo {
 }
 
 function getUserDataDir(): string {
-  // Attempt to detect User directory based on platform
-  // This is a best-guess and might need configuration for some forks
-  const appData =
-    process.env.APPDATA ||
-    (process.platform === "darwin"
-      ? process.env.HOME + "/Library/Application Support"
-      : process.env.HOME + "/.config");
+  const home = process.env.HOME || "";
+  const candidates: string[] = [];
 
-  // We try to detect the code variant.
-  // 'Code' is standard. 'Code - OSS' is VSCodium/others. 'Cursor' is Cursor.
-  // We can check what process is running or check folder existence.
-  const possibleDirs = ["Code", "Code - OSS", "VSCodium", "Cursor", "Windsurf"];
+  const platform = process.platform;
+  const isMac = platform === "darwin";
+  const isWindows = platform === "win32";
+  const isLinux = platform === "linux";
 
-  for (const dir of possibleDirs) {
-    const fullPath = path.join(appData, dir, "User");
-    if (fs.existsSync(fullPath)) {
-      return fullPath;
+  // Standard paths
+  if (isWindows && process.env.APPDATA) {
+    candidates.push(path.join(process.env.APPDATA, "Code", "User"));
+    candidates.push(path.join(process.env.APPDATA, "Code - OSS", "User"));
+    candidates.push(path.join(process.env.APPDATA, "VSCodium", "User"));
+    candidates.push(path.join(process.env.APPDATA, "Cursor", "User"));
+    candidates.push(path.join(process.env.APPDATA, "Windsurf", "User"));
+  } else if (isMac) {
+    candidates.push(
+      path.join(home, "Library", "Application Support", "Code", "User"),
+    );
+    candidates.push(
+      path.join(home, "Library", "Application Support", "Code - OSS", "User"),
+    );
+    candidates.push(
+      path.join(home, "Library", "Application Support", "VSCodium", "User"),
+    );
+    candidates.push(
+      path.join(home, "Library", "Application Support", "Cursor", "User"),
+    );
+    candidates.push(
+      path.join(home, "Library", "Application Support", "Windsurf", "User"),
+    );
+  } else if (isLinux) {
+    // Standard Config
+    candidates.push(path.join(home, ".config", "Code", "User"));
+    candidates.push(path.join(home, ".config", "Code - OSS", "User"));
+    candidates.push(path.join(home, ".config", "VSCodium", "User"));
+    candidates.push(path.join(home, ".config", "Cursor", "User"));
+    candidates.push(path.join(home, ".config", "Windsurf", "User"));
+
+    // Flatpak
+    candidates.push(
+      path.join(
+        home,
+        ".var",
+        "app",
+        "com.visualstudio.code",
+        "config",
+        "Code",
+        "User",
+      ),
+    );
+
+    // Snap
+    candidates.push(
+      path.join(home, "snap", "code", "current", ".config", "Code", "User"),
+    );
+  }
+
+  // Filter for paths that exist and contain settings.json
+  for (const candidate of candidates) {
+    if (fs.existsSync(path.join(candidate, "settings.json"))) {
+      console.log(`[Sync-On] Found settings at: ${candidate}`);
+      return candidate;
     }
   }
 
-  // Fallback to standard Code if nothing found (or let user configure)
-  return path.join(appData, "Code", "User");
+  // Fallback: Return the first candidate that exists as a directory
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) {
+      console.log(
+        `[Sync-On] Found User dir (no settings.json yet): ${candidate}`,
+      );
+      return candidate;
+    }
+  }
+
+  // Ultimate fallback
+  const defaultPath = isWindows
+    ? path.join(process.env.APPDATA || "", "Code", "User")
+    : isMac
+      ? path.join(home, "Library", "Application Support", "Code", "User")
+      : path.join(home, ".config", "Code", "User");
+
+  console.log(
+    `[Sync-On] No User dir found, validation falling back to: ${defaultPath}`,
+  );
+  return defaultPath;
 }
 
 export const USER_DIR = getUserDataDir();
 export const SETTINGS_FILE = path.join(USER_DIR, "settings.json");
 export const KEYBINDINGS_FILE = path.join(USER_DIR, "keybindings.json");
 export const SNIPPETS_DIR = path.join(USER_DIR, "snippets");
+export const MCP_FILE = path.join(USER_DIR, "mcp.json");
 
 export async function getFileContent(filePath: string): Promise<string | null> {
   if (fs.existsSync(filePath)) {
